@@ -1,6 +1,6 @@
 module Nirb
   module Pages
-    def included(base)
+    def self.included(base)
       base.class_eval do
         extend Nirb::Pages::ClassMethods
         
@@ -10,16 +10,17 @@ module Nirb
     end
 
     def call_with_pages(env)
-      initialize
+      load_environment(env)
 
-      path = @nirb[:request].path_info
-      file = File.expand_path "pages/#{path}.slim"
-
-      if File.exists? file
-        @nirb[:template] = file
+      template = @nirb[:request].path_info[1..-1] + '.slim'
+      path = File.expand_path "templates/#{template}"
+      
+      if File.exists? path
+        print "\n\nsetting template to #{template}\n\n"
+        @nirb[:template] = template
       end
 
-      call_without_pages
+      call_without_pages(env)
     end
 
     module ClassMethods

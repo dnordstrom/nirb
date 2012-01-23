@@ -1,20 +1,40 @@
 module Nirb
   class Application
-    def initialize
-      @nirb = {
-        template: 'index.slim'
+    def load_environment(env)
+      @nirb ||= {
+        # Application config
       }
+
+      @nirb[:request] = Rack::Request.new(env)
     end
 
     def call(env)
-      initialize
+      load_environment(env)
+      respond
+    end
 
-      Rack::Response.new('Hello world').finish
+    def cleanup_environment
+      @nirb.delete :template
+      @nirb.delete :request
+    end
+
+    def respond
+      @nirb[:output] = Rack::Response.new( render_template ).finish
+      
+      cleanup_environment
+      
+      @nirb[:output]
     end
 
     def render_template
-      template = @nirb[:template] || '404.slim'
-      Slim::Template.new(template).render(bindings)
+      template = File.expand_path(
+        File.join(
+          'templates',
+          @nirb[:template] || '404.slim'
+        )
+      )
+      
+      Slim::Template.new(template).render(binding)
     end
   end
 end
