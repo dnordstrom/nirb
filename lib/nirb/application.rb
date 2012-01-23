@@ -1,16 +1,15 @@
 module Nirb
   class Application
-    def load_environment(env)
-      @nirb ||= {
-        # Application config
-      }
-
+    def setup_environment(env)
+      @nirb ||= {}
       @nirb[:request] = Rack::Request.new(env)
     end
 
     def call(env)
-      load_environment(env)
-      respond
+      setup_environment(env)
+      render
+      cleanup_environment
+      output
     end
 
     def cleanup_environment
@@ -18,15 +17,11 @@ module Nirb
       @nirb.delete :request
     end
 
-    def respond
-      @nirb[:output] = Rack::Response.new( render_template ).finish
-      
-      cleanup_environment
-      
+    def output
       @nirb[:output]
     end
 
-    def render_template
+    def render
       template = File.expand_path(
         File.join(
           'templates',
@@ -34,7 +29,8 @@ module Nirb
         )
       )
       
-      Slim::Template.new(template).render(binding)
+      result = Slim::Template.new(template).render(binding)
+      @nirb[:output] = Rack::Response.new(reult).finish
     end
   end
 end
