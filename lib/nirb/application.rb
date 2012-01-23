@@ -1,12 +1,16 @@
 module Nirb
   class Application
+    # Constructor running on server start.
+    def initialize
+      @nirb = {}
+    end
+
     # Application entry point, called by Rack on each request.
     # Responsible for setting up and cleaning up environment, and
     # processing current request.
     def call(env)
       setup_environment(env)
       process_request
-      cleanup_environment
       respond
     end
 
@@ -20,28 +24,23 @@ module Nirb
 
     # Sets environment variables for current request.
     def setup_environment(env)
-      @nirb ||= {}
       @nirb[:request] = Rack::Request.new(env)
-    end
-
-    # Cleans up environment variables to get ready for the next
-    # request.
-    def cleanup_environment
-      @nirb.delete :template
-      @nirb.delete :request
+      @nirb[:output] = nil
     end
 
     # Returns output, i.e. current response.
     def respond
-      @nirb[:output] ||= render '404.slim'
-
-      Rack::Response.new @nirb[:output]
+      Rack::Response.new(@nirb[:output] || 'No template loaded.').finish
     end
 
-    # Processes Slim template and returns result.
-    def render(template)
-      template = File.expand_path( File.join('templates', template) )
-      @nirb[:output] = Slim::Template.new(template).render(binding)
+    # Returns current request object.
+    def request
+      @nirb[:request]
+    end
+
+    # Returns params hash from `Rack::Request` object.
+    def params
+      @nirb[:request].params
     end
 
     # Returns all routes specified for application.
@@ -52,9 +51,8 @@ module Nirb
     # Iterates through routes and calls match.
     def walk_the_routes
       routes.each do |route|
-        print "\n\n#{route.inspect}\n\n"
-        if route === request.path_info
-          route[:block].call unless route[:block].nil?
+        if route[:route] === request.path_info
+          instance_eval &route[:block] unless route[:block].nil?
           @nirb = route[:class].new(@nirb).call unless route[:class].nil?
         end
         
@@ -72,7 +70,7 @@ module Nirb
             end
 
             if index === route_frags.length - 1
-              route[:block].call unless route[:block].nil?
+              instance_eval &route[:block] unless route[:block].nil?
               @nirb = route[:class].new(@nirb).call unless route[:class].nil?
             end
           end
@@ -80,9 +78,30 @@ module Nirb
       end
     end
 
-    # Returns current request object.
-    def request
-      @nirb[:request]
+    # Processes Slim template and assigns result to output
+    # variable for Rack response.
+    def render(template)
+      template = File.expand_path(File.join('templates', "#{template}.slim"))
+      extension = File.extname(template)[1..-1]
+      
+      @nirb[:output] =
+        send("render_#{extension}", template) if
+          respond_to? "render_#{extension}", true
+    end
+
+    # Processes template and returns result, for use in
+    # templates.
+    def partial(template)
+      template = File.expand_path(File.join('templates', "#{template}.slim"))
+      extension = File.extname(template)[1..-1]
+      
+      send "render_#{extension}", template if
+        respond_to? "render_#{extension}", true
+    end
+
+    # Slim template rendering.
+    def render_slim(template)
+      Slim::Template.new(template).render(self)
     end
 
     class << self
