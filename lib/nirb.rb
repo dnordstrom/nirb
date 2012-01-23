@@ -1,5 +1,3 @@
-require "nirb/version"
-
-module Nirb
-  # Your code goes here...
-end
+require 'rack'
+require 'nirb/version'
+require 'nirb/application'
